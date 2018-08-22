@@ -1,0 +1,13 @@
+--ITEMS ON OPEN ORDERS WITHOUT PICKFRONTS
+--DOES NOT CORRELATE WITH ITEMS IN FLUID FLOOR LOCATIONS
+SELECT distinct od.item, ci.descr, sum(od.qtyentered) as ordered_qty, invqry.inv_qty, min(oh.entrydate) as oldest_order from orderhdr oh
+left join orderdtl od on od.orderid = oh.orderid and od.custid = oh.custid
+left join custitem ci on ci.item = od.item and ci.custid = oh.custid
+left join
+    (
+    SELECT p.item, sum(p.quantity) as inv_qty from plate p WHERE p.custid = '18159' and p.type = 'PA' and p.facility = 'EVP' GROUP BY p.item
+    ) invqry on invqry.item = od.item
+WHERE oh.orderstatus < '9' and oh.custid = '18159' and oh.fromfacility = 'EVP' and oh.ordertype = 'O'
+and od.item NOT IN (SELECT ipf.item from itempickfronts ipf WHERE ipf.custid = '18159' and ipf.facility = 'EVP')
+GROUP BY od.item, ci.descr, invqry.inv_qty
+ORDER BY ordered_qty desc;
