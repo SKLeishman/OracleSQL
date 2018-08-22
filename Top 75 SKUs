@@ -1,0 +1,47 @@
+--Top 75 picks / items on open orders and where to move to (ADD LPNS TO PULL W/O TASKS)
+SELECT tt2.*,tt3.location,tt3.lpid,tt3.quantity FROM (
+SELECT tt.custid,tt.item,tt.descr,tt.prodgroup,tt.unitcube,tt.orders,tt.lines,tt.units,tt.totalcube, 
+CASE tt.prodgroup  
+    WHEN 'BG' THEN 'Gaylord'
+    WHEN 'BPCK' THEN 'Gaylord'
+    WHEN 'DFL' THEN 'Gaylord'
+    WHEN 'OTWR' THEN 'Gaylord'
+    ELSE 'Fluid Pick'
+END AS Fast_Pick_Location, 
+CASE tt.prodgroup  
+    WHEN 'BG' THEN 'GAYL1'
+    WHEN 'BPCK' THEN 'GAYL1'
+    WHEN 'DFL' THEN 'GAYL1'
+    WHEN 'OTWR' THEN 'GAYL1'
+    ELSE 'FSTO'
+END AS Fast_Pick_Zone,t2.units_in_zone,t2.locid,
+ipf.pickfront FROM (
+    SELECT '18159' as custid, od.item, ci.descr, substr(ci.itmpassthruchar03,3,INSTR(ci.itmpassthruchar03,'-',3)-3) as prodgroup,
+    round(ci.cube/1728,4) as unitcube, count(distinct oh.orderid) as orders, count(od.item) as lines, sum(od.qtyentered) as units,
+    round(ci.cube/1728,4) * sum(od.qtyentered) as totalcube
+    from orderhdr oh 
+    left join orderdtl od on oh.orderid = od.orderid and oh.custid = od.custid
+    left join custitem ci on od.item = ci.item and od.custid = ci.custid
+    where oh.orderstatus < '3' and oh.custid = '18159' and oh.ordertype = 'O'
+    group by od.item, ci.descr, ci.cube, ci.itmpassthruchar03
+    order by lines desc
+) tt 
+left join itempickfronts ipf on ipf.item = tt.item and ipf.custid = tt.custid
+left join (SELECT p.item, loc.locid,loc.pickingzone, sum(p.quantity) as units_in_zone from plate p
+left join location loc on loc.locid = p.location and loc.custid = p.custid
+where p.type = 'PA' and p.custid = '18159' and loc.pickingzone in ('FSTO','GAYL1')
+group by p.item,p.location,loc.locid,loc.pickingzone) t2 on tt.item = t2.item
+where ROWNUM <= 75
+) tt2
+left join 
+(
+SELECT PLATE.LPID,PLATE.ITEM,PLATE.QUANTITY, LOCATION FROM PLATE 
+LEFT JOIN LOCATION ON LOCATION.LOCID = PLATE.LOCATION and LOCATION.CUSTID = PLATE.CUSTID
+WHERE PLATE.CUSTID = '18159' and PLATE.TYPE = 'PA' and LOCATION.LOCTYPE = 'STO' AND PLATE.LPID NOT IN (SELECT TASKS.LPID FROM TASKS WHERE TASKS.CUSTID = '18159' AND TASKS.LPID IS NOT NULL) ORDER BY PLATE.QUANTITY DESC
+) tt3 on tt2.item = tt3.item
+;
+
+--AGED ORDERS
+SELECT * FROM Orderhdr
+Where CUSTID = '18159'
+;
